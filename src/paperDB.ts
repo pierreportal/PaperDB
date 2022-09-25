@@ -1,34 +1,49 @@
-import fs from 'fs';
+import fs from 'fs'
+import path from 'path';
 import { log, error, success } from './output';
 
 export class PaperDB {
 
   private file: string;
   public in: any;
+  private dir: string;
 
   constructor(fileName: string) {
-
-    this.file = "";
+    this.dir = '.db';
+    this.file = this.initDB(fileName);
     this.in = {}
-    this.createFile(fileName);
+
+  }
+
+  private initDB(fileName: string) {
+
+    if (!fs.existsSync(this.dir)) {
+      fs.mkdirSync(this.dir);
+    }
+
+    const file = path.join(this.dir, fileName);
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, '{}');
+    }
+    return file;
   }
 
   public useFile = (fileName: string) => {
 
-    if (!fs.existsSync(fileName)) {
+    if (!fs.existsSync(path.join(this.dir, fileName))) {
       return error("File not found");
     }
-    this.file = fileName;
+    this.file = path.join(this.dir, fileName);
   }
 
   public createFile = (fileName: string) => {
 
-    if (fs.existsSync(fileName)) {
+    if (fs.existsSync(path.join(this.dir, fileName))) {
       return error("File already exists");
     }
 
-    fs.writeFileSync(fileName, '{}');
-    this.file = fileName;
+    fs.writeFileSync(path.join(this.dir, fileName), '{}');
+    return path.join(this.dir, fileName);
   }
 
   private readFile = () => {
