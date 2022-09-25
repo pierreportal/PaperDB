@@ -16,9 +16,13 @@ const PostSchema = {
   date: 'string',
 };
 
-db.collections.add("Users", UserSchema);
-db.collections.add("Posts", PostSchema);
+if (!db.collections.find("Users")) {
+  db.collections.add("Users", UserSchema);
+}
 
+if (!db.collections.find("Posts")) {
+  db.collections.add("Posts", PostSchema);
+}
 
 db.get()
 

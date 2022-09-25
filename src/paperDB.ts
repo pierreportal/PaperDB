@@ -11,11 +11,12 @@ export class PaperDB {
 
   constructor(fileName: string) {
     this.dir = '.db';
-    this.file = this.initDB(fileName);
     this.collections = {
+      find: this.getCollection,
       add: this.createCollection,
       delete: this.deleteCollection,
     }
+    this.file = this.initDB(fileName);
   }
 
   private initDB(fileName: string) {
@@ -27,6 +28,13 @@ export class PaperDB {
     const file = path.join(this.dir, fileName);
     if (!fs.existsSync(file)) {
       fs.writeFileSync(file, '{}');
+    } else {
+      this.file = path.join(this.dir, fileName);
+      const json = this.readFile();
+      const collections = Object.keys(json);
+      collections.forEach((collection: string) => {
+        this.createCollection(collection, json[collection].schema);
+      });
     }
     return file;
   }
@@ -62,14 +70,13 @@ export class PaperDB {
     const json = this.readFile();
     if (!json) return false;
     if (!json[collection]) {
-      return error(`Collection ${collection} not found`);
+      error(`Collection ${collection} not found`);
+      return false;
     }
     return json[collection];
   }
 
   public createCollection = (collectionName: string, schema: any) => {
-
-    console.log("Creating collection", collectionName, schema);
 
     if (typeof collectionName !== 'string') {
       return ('Collection name must be a string');
@@ -80,14 +87,6 @@ export class PaperDB {
 
     const collName = collectionName.charAt(0).toUpperCase() + collectionName.slice(1);
 
-    if (json[collName]) {
-      return error(`Collection ${collName} already exists.`);
-    }
-
-    Object.assign(json, { [collName]: { schema, data: [] } });
-
-    fs.writeFileSync(this.file!, JSON.stringify(json));
-
     this.collections[collName] = {
       insert: (data: any) => this.insertItem(collName, data),
       find: (query?: any) => this.findItems(collName, query),
@@ -97,6 +96,14 @@ export class PaperDB {
       delete: (query: any) => this.deleteItem(collName, query)
     }
 
+    if (!!json[collName]) {
+      error(`Collection ${collName} already exists.`);
+      return false;
+    }
+
+    Object.assign(json, { [collName]: { schema, data: [] } });
+
+    fs.writeFileSync(this.file!, JSON.stringify(json));
     return success(`Collection ${collName} created.`);
   }
 
@@ -126,7 +133,6 @@ export class PaperDB {
 
     const schemaKeys = Object.keys(schema);
     const dataKeys = Object.keys(data);
-    console.log(schemaKeys, dataKeys);
 
     const errors: Array<string> = [];
 
@@ -161,10 +167,7 @@ export class PaperDB {
       return error(`Collection ${collectionName} not found`);
     }
 
-    console.log('schema::::::', json[collectionName]);
-
     const typeChecking = this.typeCheck(json[collectionName].schema, data);
-    console.log(typeChecking);
 
     if (!typeChecking) {
       return error("Data does not match schema");
