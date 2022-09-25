@@ -1,4 +1,5 @@
 export const error = (message: string) => {
+  console.log(`[PaperDB] ${message}`);
   return { error: true, message };
 }
 

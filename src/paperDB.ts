@@ -1,18 +1,21 @@
 import fs from 'fs'
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { log, error, success } from './output';
 
 export class PaperDB {
 
   private file: string;
-  public in: any;
   private dir: string;
+  public collections: any;
 
   constructor(fileName: string) {
     this.dir = '.db';
     this.file = this.initDB(fileName);
-    this.in = {}
-
+    this.collections = {
+      add: this.createCollection,
+      delete: this.deleteCollection,
+    }
   }
 
   private initDB(fileName: string) {
@@ -64,8 +67,9 @@ export class PaperDB {
     return json[collection];
   }
 
+  public createCollection = (collectionName: string, schema: any) => {
 
-  public createCollection = (collectionName: string) => {
+    console.log("Creating collection", collectionName, schema);
 
     if (typeof collectionName !== 'string') {
       return ('Collection name must be a string');
@@ -80,13 +84,13 @@ export class PaperDB {
       return error(`Collection ${collName} already exists.`);
     }
 
-    Object.assign(json, { [collName]: { "data": [] } });
+    Object.assign(json, { [collName]: { schema, data: [] } });
 
     fs.writeFileSync(this.file!, JSON.stringify(json));
 
-    this.in[collName] = {
+    this.collections[collName] = {
       insert: (data: any) => this.insertItem(collName, data),
-      find: (query: any) => this.findItems(collName, query),
+      find: (query?: any) => this.findItems(collName, query),
       findOne: (query: any) => this.findOneItem(collName, query),
       findById: (id: string) => this.findItemById(collName, id),
       update: (query: any, data: any) => this.updateItem(collName, query, data),
@@ -95,6 +99,58 @@ export class PaperDB {
 
     return success(`Collection ${collName} created.`);
   }
+
+  public deleteCollection = (collectionName: string) => {
+
+    if (typeof collectionName !== 'string') {
+      return ('Collection name must be a string');
+    }
+
+    const json = this.readFile();
+    if (!json) return false;
+
+    if (!json[collectionName]) {
+      return error(`Collection ${collectionName} not found.`);
+    }
+
+    delete json[collectionName];
+
+    fs.writeFileSync(this.file!, JSON.stringify(json));
+
+    delete this.collections[collectionName];
+
+    return success(`Collection ${collectionName} deleted.`);
+  }
+
+  private typeCheck = (schema: any, data: any) => {
+
+    const schemaKeys = Object.keys(schema);
+    const dataKeys = Object.keys(data);
+    console.log(schemaKeys, dataKeys);
+
+    const errors: Array<string> = [];
+
+    if (schemaKeys.length !== dataKeys.length) {
+      error("Data does not match schema");
+      return false;
+    }
+
+    for (let i = 0; i < schemaKeys.length; i++) {
+      const key = schemaKeys[i];
+      const schemaType = schema[key];
+      const valueType = typeof data[key];
+
+      if (schemaType !== valueType) {
+        errors.push(`Type error: ${key} should be a ${schemaType}`);
+      }
+    }
+    if (errors.length > 0) {
+      error(errors.join(", "));
+      return false;
+    }
+    return true;
+  }
+
 
   public insertItem = (collectionName: string, data: any) => {
 
@@ -105,14 +161,45 @@ export class PaperDB {
       return error(`Collection ${collectionName} not found`);
     }
 
-    json[collectionName].data.push(data);
+    console.log('schema::::::', json[collectionName]);
+
+    const typeChecking = this.typeCheck(json[collectionName].schema, data);
+    console.log(typeChecking);
+
+    if (!typeChecking) {
+      return error("Data does not match schema");
+    }
+
+    json[collectionName].data.push({ ...data, id: uuidv4() });
 
     fs.writeFileSync(this.file!, JSON.stringify(json));
 
     return success(`Item inserted in ${collectionName}.`);
   }
 
-  public findItems = (collectionName: string, query: any) => {
+  public insertManyItems = (collectionName: string, data: Array<any>) => {
+
+    const json = this.readFile();
+    if (!json) return false;
+
+    if (!json[collectionName]) {
+      return error(`Collection ${collectionName} not found`);
+    }
+
+    const typeChecking = data.every((item: any) => this.typeCheck(json[collectionName].schema, item));
+
+    if (!typeChecking) {
+      return error("Data does not match schema");
+    }
+
+    json[collectionName].data.push(...data.map((item: any) => ({ ...item, id: uuidv4() })));
+
+    fs.writeFileSync(this.file!, JSON.stringify(json));
+
+    return success(`${data.length} items inserted in ${collectionName}.`);
+  }
+
+  public findItems = (collectionName: string, query?: any) => {
 
     const json = this.readFile();
     if (!json) return false;
@@ -121,6 +208,10 @@ export class PaperDB {
     }
 
     const data = json[collectionName].data;
+
+    if (!query) {
+      return success(data);
+    }
 
     const key = Object.keys(query)[0];
 
@@ -206,7 +297,7 @@ export class PaperDB {
     if (!json) return false;
 
     console.log(json);
-    return null;
+    return json;
   }
 }
 
