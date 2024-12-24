@@ -1,6 +1,7 @@
 # PaperDB
 
 PaperDB is a lightweight and minimalistic document based NoSQL data base, easy to use for quick local experiments. 
+![carbon (1)](https://github.com/user-attachments/assets/4f300ce8-b880-45ca-b585-cb18f298e740)
 
 ## Operations 
 
